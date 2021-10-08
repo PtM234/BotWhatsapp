@@ -1,3 +1,4 @@
+import io
 import random
 import threading
 import lecturaExcel
@@ -11,28 +12,14 @@ import webbrowser as web
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename
 from tkinter.filedialog import askdirectory
-from urllib.parse import quote
-from io import StringIO
 from PIL import Image
 import win32clipboard
 from openpyxl import Workbook
+import os
 
 
 class App(tk.Tk):
     def __init__(self):
-        #Funciones que necesito:
-        #1.- Leer Excel de recipientes{
-        #       List donde guardar los recipientes
-        #}
-        #2.- Leer Excel de mensajes{
-        #       List donde guardar los mensajes
-        #}
-        #3.- Especificar directorio para la impresión del reporte{
-        #       List donde se guarde qué mensaje se le manda a qué numero
-        #}
-        #4.- Copiar imagen a clipboard
-        #5.-
-
         super().__init__()
         opts = {'ipadx': 50, 'ipady': 5, 'fill': tk.Y}
         btn_opts = {"expand": True, "fill": tk.X, "ipadx": 50, "padx": 20, "pady": 5}
@@ -63,6 +50,7 @@ class App(tk.Tk):
         self.btnComenzar = tk.Button(self, text="Comenzar ejecución", command=self.comenzar)
         self.btnDetener = tk.Button(self, text="Detener", command=self.terminoEjecucion)
         self.btnDirectorio = tk.Button(self, text="Elige un directorio donde guardar los reportes", command=self.obtenerDirectorio)
+        self.title("Bot WhatsApp")
 
         self.btnContactos.pack(**btn_opts)
         self.btnMensajes.pack(**btn_opts)
@@ -72,7 +60,6 @@ class App(tk.Tk):
         self.btnDetener.pack(**btn_opts)
         self.labelTiempo.pack(**opts)
         self.listaDesplegable.pack(**btn_opts)
-
 
     def fechaActual(self):
         now = datetime.now()
@@ -92,13 +79,13 @@ class App(tk.Tk):
                     if self.boolImg:
                         self.fechaActual()
                         self.desactivarBotones()
-                        t1 = threading.Thread(target = self.enviarMsgsImg)
+                        t1 = threading.Thread(target = self.enviarMsgsImg())
                         t1.daemon = True
                         t1.start()
                     else:
                         self.fechaActual()
                         self.desactivarBotones()
-                        t1 = threading.Thread(target = self.enviarMsgs)
+                        t1 = threading.Thread(target = self.enviarMsgs())
                         t1.daemon = True
                         t1.start()
                 elif not self.boolMensajes:
@@ -118,60 +105,66 @@ class App(tk.Tk):
     def enviarMsgsImg(self):
         if self.Running:
             try:
-                if self.browser and self.browser.lower() not in ["chrome", "firefox", "brave", "opera"]:
-                    win32api.MessageBox(0, "Solo funciona con Chrome, Firefox, Brave y Opera", "Error")
-                    self.Running = False
-                    print("Entró aquí, este es el problema")
-                elif self.browser:
-                    parsedMessage = quote(self.obtenerMensaje())
-                    numeroTelefono = self.obtenerNumero()
-                    web.open(f'https://web.whatsapp.com/send?phone={numeroTelefono}&text={parsedMessage}')
-                    whats = pg.getWindowsWithTitle(self.browser)[0]
-                    whats.maximize()
-                    whats.activate()
-                    width, height = pg.size()
-                    pg.click(width / 2, height / 2)
-                    pg.hotkey('ctrl', 'v')
-                    time.sleep(15)
-                    pg.press('enter')
-                    self.listaAcciones.append(f"Mensaje: {parsedMessage} enviado al numero: {numeroTelefono}")
-                    print(f"Lugar #{self.contador} de {len(self.longitudContactos)}")
-                    if len(self.listaContactos>=1):
-                        tempo = int(self.listaDesplegable.get())
-                        time.sleep(tempo + random.randint(10, 25))
-                        self.enviarMsgsImg()
-                    else:
-                        win32api.MessageBox(0, "Se terminó la ejecución del programa", "Terminado")
-                        self.imprimirAccionesExcel()
+                parsedMessage = self.obtenerMensaje()
+                numeroTelefono = self.obtenerNumero()
+                web.open(f'https://web.whatsapp.com/send?phone=+52{numeroTelefono}&text={parsedMessage}')
+                whats = pg.getWindowsWithTitle("chrome")[0]
+                width, height = pg.size()
+                whats.maximize()
+                whats.activate()
+                time.sleep(15)
+                pg.click(width / 2, height / 2)
+                pg.hotkey('ctrl', 'v')
+                time.sleep(15)
+                pg.press('enter')
+                time.sleep(15)
+                pg.hotkey('ctrl', 'w')
+                self.listaAcciones.append(f"Imagen con mensaje: {parsedMessage} enviado al numero: {numeroTelefono}")
+                print(f"Lugar #{self.contador} de {self.longitudContactos}")
+                print(f"Se envió el mensaje {parsedMessage} al numero {numeroTelefono}")
+                self.contador= self.contador + 1
+                if len(self.listaContactos) >= 1:
+                    tempo = (int(self.listaDesplegable.get()) * 60) + random.randint(10,25)
+                    print(f"Siguiente acción en: {int(tempo / 60)} minutos y {tempo % 60} segundos")
+                    time.sleep(tempo)
+                    self.enviarMsgsImg()
+                else:
+                    win32api.MessageBox(0, "Se terminó la ejecución del programa", "Terminado")
+                    print("Se terminó la ejecución del programa")
+                    self.imprimirAccionesExcel()
+                    self.terminoEjecucion()
             except:
                 print("Hubo un error")
 
-    def enviarMsgs(self):
+    def enviarMsgs(self, browser = None):
         if self.Running:
             try:
-                if self.browser and self.browser.lower() not in ["chrome", "firefox", "brave", "opera"]:
-                    win32api.MessageBox(0, "Solo funciona con Chrome, Firefox, Brave y Opera", "Error")
-                    self.Running = False
-                    print("Entró aquí, este es el problema")
-                elif self.browser:
-                    parsedMessage = quote(self.obtenerMensaje)
-                    numeroTelefono = self.obtenerNumero
-                    web.open(f'https://web.whatsapp.com/send?phone={numeroTelefono}&text={parsedMessage}')
-                    whats = pg.getWindowsWithTitle(self.browser)[0]
-                    whats.maximize()
-                    whats.activate()
-                    width, height = pg.size()
-                    pg.click(width / 2, height / 2)
-                    pg.press('enter')
-                    self.listaAcciones.append(f"Mensaje: {parsedMessage} enviado al numero: {numeroTelefono}")
-                    print(f"Lugar #{self.contador} de {len(self.longitudContactos)}")
-                    if len(self.listaContactos>=1):
-                        tempo = int(self.listaDesplegable.get())
-                        time.sleep(tempo + random.randint(10, 25))
-                        self.enviarMsgs()
-                    else:
-                        win32api.MessageBox(0, "Se terminó la ejecución del programa", "Terminado")
-                        self.imprimirAccionesExcel()
+                parsedMessage = self.obtenerMensaje()
+                numeroTelefono = self.obtenerNumero()
+                web.open(f'https://web.whatsapp.com/send?phone=+52{numeroTelefono}&text={parsedMessage}')
+                whats = pg.getWindowsWithTitle("chrome")[0]
+                width, height = pg.size()
+                whats.maximize()
+                whats.activate()
+                time.sleep(15)
+                pg.click(width / 2, height / 2)
+                pg.press('enter')
+                time.sleep(5)
+                pg.hotkey('ctrl', 'w')
+                self.listaAcciones.append(f"Mensaje: {parsedMessage} enviado al numero: {numeroTelefono}")
+                print(f"Lugar #{self.contador} de {self.longitudContactos}")
+                self.contador = self.contador + 1
+                if len(self.listaContactos)>=1:
+                    tempo = (int(self.listaDesplegable.get()) * 60) + random.randint(10,25)
+                    print(f"Siguiente acción en: {int(tempo / 60)} minutos y {tempo % 60} segundos")
+                    time.sleep(tempo)
+                    self.enviarMsgs()
+                else:
+                    win32api.MessageBox(0, "Se terminó la ejecución del programa", "Terminado")
+                    print("Se terminó la ejecución del programa")
+                    self.imprimirAccionesExcel()
+                    self.terminoEjecucion()
+
             except:
                 print("Hubo un error")
 
@@ -181,6 +174,7 @@ class App(tk.Tk):
             self.boolDireccionDirectorios = True
             self.btnDirectorio.config(state = tk.DISABLED)
             print(self.direccionDirectorio)
+            print(os.environ)
         except:
             print("Ocurrió un error al elegir el directorio donde se guardarán los reportes")
 
@@ -202,7 +196,7 @@ class App(tk.Tk):
         try:
             self.direccionImagen = askopenfilename()
             imagen = Image.open(self.direccionImagen)
-            output = StringIO()
+            output = io.BytesIO()
             imagen.convert("RGB").save(output, "BMP")
             data = output.getvalue()[14:]
             output.close()
@@ -244,7 +238,12 @@ class App(tk.Tk):
             for contacto in self.listaContactos:
                 ws.cell(row = r, column = 1).value = contacto
                 r = r+1
-            wb.save("numerosFaltantes.xlsx")
+            now = datetime.now()
+            hora = now.strftime('%H%M%S')
+            day = now.strftime("%d")
+            month = now.strftime("%B")
+            year = now.strftime("%Y")
+            wb.save(f"numerosFaltantes el día {day} de {month} del {year} a las {hora}.xlsx")
             wb.close()
 
     def terminoEjecucion(self):
